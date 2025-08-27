@@ -12,14 +12,11 @@ const {
 } = require('../controllers/user.controller');
 const { protect, isAdmin } = require('../middlewares/auth.middleware');
 
-// --- বিক্রেতা হওয়ার আবেদনের জন্য নতুন রুট ---
 router.post('/apply-seller', protect, applyToBeSeller);
 
-// --- অ্যাডমিনের জন্য রুট ---
 router.get('/sellers/pending', protect, isAdmin, getPendingSellers);
 router.put('/sellers/approve/:id', protect, isAdmin, approveSeller);
 
-// --- আপনার আগের সঠিক রুটগুলো ---
 router.route('/profile')
     .put(protect, updateUserProfile);
 

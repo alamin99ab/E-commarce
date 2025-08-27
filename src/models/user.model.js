@@ -19,14 +19,13 @@ const userSchema = new mongoose.Schema({
     },
     password: {
         type: String,
-        required: function() { return !this.googleId; } // Required only if not a Google login user
+        required: function() { return !this.googleId; }
     },
     role: {
         type: String,
         enum: ['customer', 'seller', 'admin'],
         default: 'customer',
     },
-    // For email verification
     isVerified: {
         type: Boolean,
         default: false,
@@ -34,7 +33,6 @@ const userSchema = new mongoose.Schema({
     verificationToken: {
         type: String,
     },
-    // For Two-Factor Authentication (Admins)
     twoFactorSecret: {
         type: String,
     },
@@ -42,7 +40,6 @@ const userSchema = new mongoose.Schema({
         type: Boolean,
         default: false,
     },
-    // Seller specific fields
     approvalStatus: {
         type: String,
         enum: ['pending', 'approved', 'rejected'],
@@ -57,7 +54,12 @@ const userSchema = new mongoose.Schema({
     businessLogo: {
         type: String,
     },
-    // Generic user fields
+    paymentDetails: {
+        bankName: String,
+        accountNumber: String,
+        accountHolderName: String,
+        mobileBankingNumber: String,
+    },
     isActive: {
         type: Boolean,
         default: true
@@ -91,7 +93,6 @@ const userSchema = new mongoose.Schema({
     timestamps: true
 });
 
-// Hash password before saving
 userSchema.pre('save', async function(next) {
     if (!this.isModified('password') || !this.password) {
         return next();
@@ -105,7 +106,6 @@ userSchema.pre('save', async function(next) {
     }
 });
 
-// Method to check password correctness
 userSchema.methods.isPasswordCorrect = async function(enteredPassword) {
     if (this.googleId || !this.password) return false;
     return await bcrypt.compare(enteredPassword, this.password);

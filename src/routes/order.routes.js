@@ -6,25 +6,21 @@ const {
     getMyOrders,
     getAllOrders,
     updateOrderStatus,
-    createCodOrder // <-- নতুন ফাংশনটি এখানে ইম্পোর্ট করা হয়েছে
+    createCodOrder,
+    getSellerOrders
 } = require('../controllers/order.controller');
-const { protect, isAdmin } = require('../middlewares/auth.middleware'); // আপনার middleware অনুযায়ী 'protect' ব্যবহার করা হয়েছে
+const { protect, isSeller, isAdmin } = require('../middlewares/auth.middleware');
 
-// --- ক্যাশ অন ডেলিভারি অর্ডার তৈরির জন্য নতুন রুট ---
-router.post('/cod', protect, createCodOrder);
+// Customer Routes
+router.post('/', protect, createCodOrder);
+router.get('/my-orders', protect, getMyOrders);
+router.get('/:id', protect, getOrderById);
 
-// --- আপনার পুরনো রুটগুলো ---
-router.route('/')
-    .post(protect, createOrder)
-    .get(protect, isAdmin, getAllOrders);
+// Seller Route
+router.get('/seller/my-orders', protect, isSeller, getSellerOrders);
 
-router.route('/myorders')
-    .get(protect, getMyOrders);
-
-router.route('/:id')
-    .get(protect, getOrderById);
-
-router.route('/:id/status')
-    .put(protect, isAdmin, updateOrderStatus);
+// Admin Routes
+router.get('/', protect, isAdmin, getAllOrders);
+router.put('/status/:id', protect, isAdmin, updateOrderStatus);
 
 module.exports = router;

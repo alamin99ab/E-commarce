@@ -1,10 +1,8 @@
 const Product = require('../models/product.model');
 const User = require('../models/user.model');
 
-// --- নতুন ফাংশন: একজন বিক্রেতার নিজের সব পণ্য পাওয়া ---
 const getMyProducts = async (req, res, next) => {
     try {
-        // শুধুমাত্র লগইন করা বিক্রেতার পণ্যগুলো খুঁজে বের করা হচ্ছে
         const products = await Product.find({ seller: req.user._id })
             .populate('category', 'name');
         res.status(200).json({ success: true, products });
@@ -13,7 +11,6 @@ const getMyProducts = async (req, res, next) => {
     }
 };
 
-// --- আপনার আগের সঠিক ফাংশনগুলো ---
 const createProduct = async (req, res, next) => {
     try {
         const product = new Product({
@@ -29,17 +26,36 @@ const createProduct = async (req, res, next) => {
 
 const getAllProducts = async (req, res, next) => {
     try {
-        const { keyword, category } = req.query;
+        const { keyword, category, minPrice, maxPrice, rating, sort } = req.query;
         const filter = {};
+
         if (keyword) {
             filter.name = { $regex: keyword, $options: 'i' };
         }
         if (category) {
             filter.category = category;
         }
+        if (minPrice && maxPrice) {
+            filter.price = { $gte: Number(minPrice), $lte: Number(maxPrice) };
+        }
+        if (rating) {
+            filter.rating = { $gte: Number(rating) };
+        }
+
+        let sortOption = {};
+        if (sort === 'price-asc') {
+            sortOption = { price: 1 };
+        } else if (sort === 'price-desc') {
+            sortOption = { price: -1 };
+        } else {
+            sortOption = { createdAt: -1 };
+        }
+
         const products = await Product.find(filter)
             .populate('category', 'name')
-            .populate('seller', 'name businessName');
+            .populate('seller', 'name businessName')
+            .sort(sortOption);
+
         res.status(200).json({ success: true, products });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Error fetching products.', error: error.message });
@@ -125,7 +141,6 @@ const createProductReview = async (req, res, next) => {
     }
 };
 
-// **সব ফাংশন একসাথে এক্সপোর্ট করা হচ্ছে**
 module.exports = {
     createProduct,
     getAllProducts,
@@ -133,5 +148,5 @@ module.exports = {
     updateProduct,
     deleteProduct,
     createProductReview,
-    getMyProducts, // <-- নতুন ফাংশনটি এখানে যোগ করা হয়েছে
+    getMyProducts,
 };

@@ -1,6 +1,5 @@
 const User = require('../models/user.model');
 
-// --- নতুন ফাংশন: বিক্রেতা হওয়ার জন্য আবেদন ---
 const applyToBeSeller = async (req, res, next) => {
     try {
         const userId = req.user.id;
@@ -26,7 +25,6 @@ const applyToBeSeller = async (req, res, next) => {
     }
 };
 
-// --- নতুন ফাংশন: অপেক্ষমাণ বিক্রেতাদের তালিকা ---
 const getPendingSellers = async (req, res, next) => {
     try {
         const pendingSellers = await User.find({ approvalStatus: 'pending', role: 'seller' }).select('-password');
@@ -36,7 +34,6 @@ const getPendingSellers = async (req, res, next) => {
     }
 };
 
-// --- নতুন ফাংশন: বিক্রেতার আবেদন অনুমোদন ---
 const approveSeller = async (req, res, next) => {
     try {
         const user = await User.findById(req.params.id);
@@ -52,7 +49,6 @@ const approveSeller = async (req, res, next) => {
     }
 };
 
-// --- আপনার আগের সঠিক ফাংশনগুলো ---
 const getAllUsers = async (req, res, next) => {
     try {
         const users = await User.find({}).select('-password');
@@ -83,8 +79,10 @@ const updateUserProfile = async (req, res, next) => {
             }
             const updatedUser = await user.save();
             res.status(200).json({
-                _id: updatedUser._id, name: updatedUser.name,
-                email: updatedUser.email, role: updatedUser.role,
+                _id: updatedUser._id,
+                name: updatedUser.name,
+                email: updatedUser.email,
+                role: updatedUser.role,
             });
         } else {
             res.status(404).json({ message: 'User not found.' });
@@ -126,7 +124,6 @@ const deleteUser = async (req, res, next) => {
     }
 };
 
-// **সব ফাংশন একসাথে এক্সপোর্ট করা হচ্ছে**
 module.exports = {
     getAllUsers,
     getUserById,

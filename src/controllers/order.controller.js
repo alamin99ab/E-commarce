@@ -1,16 +1,40 @@
 const Order = require('../models/order.model');
 const Product = require('../models/product.model');
+const User = require('../models/user.model');
 const { v4: uuidv4 } = require('uuid');
 
-// --- ক্যাশ অন ডেলিভারি অর্ডার তৈরির জন্য নতুন কন্ট্রোলার ---
 const createCodOrder = async (req, res, next) => {
     try {
-        const { cartItems, shippingInfo, totalPrice } = req.body;
+        const { cartItems, shippingInfo, totalPrice, coinsToUse = 0 } = req.body;
+        const user = await User.findById(req.user.id);
+
+        if (coinsToUse > 0) {
+            if (user.coinBalance < coinsToUse) {
+                return res.status(400).json({ success: false, message: "You don't have enough coins." });
+            }
+            if (coinsToUse > totalPrice) {
+                return res.status(400).json({ success: false, message: "You cannot use more coins than the order total." });
+            }
+        }
+
+        for (const item of cartItems) {
+            const product = await Product.findById(item._id);
+            if (!product) {
+                return res.status(404).json({ success: false, message: `Product not found.` });
+            }
+            if (product.stock < item.quantity) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Not enough stock for ${product.name}. Available stock: ${product.stock}`,
+                });
+            }
+        }
+
+        const finalPrice = totalPrice - coinsToUse;
 
         let finalOrderItems = [];
         for (const item of cartItems) {
             const productData = await Product.findById(item._id);
-            // বিক্রেতা না থাকলে অ্যাডমিনকে ডিফল্ট বিক্রেতা হিসেবে সেট করা
             const sellerId = productData.seller || process.env.ADMIN_USER_ID;
             if (!sellerId) {
                 return res.status(400).json({ message: `Product "${productData.name}" is missing a seller.` });
@@ -28,15 +52,26 @@ const createCodOrder = async (req, res, next) => {
             user: req.user.id,
             shippingInfo,
             orderItems: finalOrderItems,
-            totalPrice,
+            totalPrice: finalPrice,
             paymentMethod: 'Cash on Delivery',
             orderStatus: 'Processing',
             paymentInfo: { status: 'Unpaid' },
         });
 
+        for (const item of finalOrderItems) {
+            await Product.findByIdAndUpdate(item.product, {
+                $inc: { stock: -item.quantity },
+            });
+        }
+
+        const coinsEarned = Math.floor(finalPrice * 0.1);
+        await User.findByIdAndUpdate(req.user.id, {
+            $inc: { coinBalance: coinsEarned - coinsToUse },
+        });
+
         res.status(201).json({
             success: true,
-            message: 'Order placed successfully!',
+            message: `Order placed successfully! You used ${coinsToUse} coins and earned ${coinsEarned} coins.`,
             order,
         });
     } catch (error) {
@@ -44,7 +79,6 @@ const createCodOrder = async (req, res, next) => {
     }
 };
 
-// --- আপনার পুরনো কন্ট্রোলার ফাংশনগুলো ---
 const createOrder = async (req, res, next) => {
     try {
         const { orderItems, shippingAddress, paymentMethod, itemsPrice, shippingPrice, totalPrice } = req.body;
@@ -52,8 +86,13 @@ const createOrder = async (req, res, next) => {
             return res.status(400).json({ message: 'No order items provided.' });
         }
         const order = new Order({
-            user: req.user._id, orderItems, shippingAddress, paymentMethod,
-            itemsPrice, shippingPrice, totalPrice,
+            user: req.user._id,
+            orderItems,
+            shippingAddress,
+            paymentMethod,
+            itemsPrice,
+            shippingPrice,
+            totalPrice,
         });
         const createdOrder = await order.save();
         res.status(201).json(createdOrder);
@@ -61,10 +100,13 @@ const createOrder = async (req, res, next) => {
         next(error);
     }
 };
+
 const getOrderById = async (req, res, next) => {
     try {
         const order = await Order.findById(req.params.id).populate('user', 'name email');
-        if (!order) return res.status(404).json({ message: 'Order not found.' });
+        if (!order) {
+            return res.status(404).json({ message: 'Order not found.' });
+        }
         if (order.user._id.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
             return res.status(403).json({ message: 'Not authorized to view this order.' });
         }
@@ -73,6 +115,7 @@ const getOrderById = async (req, res, next) => {
         next(error);
     }
 };
+
 const getMyOrders = async (req, res, next) => {
     try {
         const orders = await Order.find({ user: req.user._id });
@@ -81,6 +124,7 @@ const getMyOrders = async (req, res, next) => {
         next(error);
     }
 };
+
 const getAllOrders = async (req, res, next) => {
     try {
         const orders = await Order.find({}).populate('user', 'id name');
@@ -89,6 +133,7 @@ const getAllOrders = async (req, res, next) => {
         next(error);
     }
 };
+
 const updateOrderStatus = async (req, res, next) => {
     try {
         const order = await Order.findById(req.params.id);
@@ -104,12 +149,42 @@ const updateOrderStatus = async (req, res, next) => {
     }
 };
 
-// **সব ফাংশন একসাথে এক্সপোর্ট করা হচ্ছে**
+const getSellerOrders = async (req, res, next) => {
+    try {
+        const sellerId = req.user.id;
+        const orders = await Order.find({ "orderItems.seller": sellerId })
+            .populate('user', 'name email')
+            .populate('orderItems.product', 'name images');
+
+        if (!orders) {
+            return res.status(200).json({ success: true, orders: [] });
+        }
+        
+        const sellerOrders = orders.map(order => {
+            const sellerItems = order.orderItems.filter(item => item.seller.toString() === sellerId);
+            return {
+                _id: order._id,
+                user: order.user,
+                shippingInfo: order.shippingInfo,
+                totalPrice: order.totalPrice,
+                orderStatus: order.orderStatus,
+                createdAt: order.createdAt,
+                items: sellerItems
+            };
+        });
+
+        res.status(200).json({ success: true, orders: sellerOrders });
+    } catch (error) {
+        next(error);
+    }
+};
+
 module.exports = {
     createOrder,
     getOrderById,
     getMyOrders,
     getAllOrders,
     updateOrderStatus,
-    createCodOrder, // <-- নতুন ফাংশনটি এখানে যোগ করা হয়েছে
+    createCodOrder,
+    getSellerOrders,
 };

@@ -7,15 +7,13 @@ const {
     updateProduct,
     deleteProduct,
     createProductReview,
-    getMyProducts // <-- নতুন ফাংশনটি এখানে ইম্পোর্ট করা হয়েছে
+    getMyProducts
 } = require('../controllers/product.controller');
 const { protect, isSeller, isSellerApproved } = require('../middlewares/auth.middleware');
 
-// --- আপনার আগের সঠিক রুটগুলো ---
 router.get('/', getAllProducts);
 router.post('/', protect, isSeller, isSellerApproved, createProduct);
 
-// --- নতুন রুট: বিক্রেতার নিজের পণ্যগুলো পাওয়ার জন্য ---
 router.get('/my-products', protect, isSeller, getMyProducts);
 
 router.get('/:id', getProductById);

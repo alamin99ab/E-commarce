@@ -1,44 +1,50 @@
 const mongoose = require('mongoose');
 
 const orderSchema = new mongoose.Schema({
-    shippingInfo: {
-        address: { type: String, required: true },
-        city: { type: String, required: true },
-        phoneNo: { type: String },
-        postalCode: { type: String, required: true },
-        country: { type: String, required: true },
-    },
     user: {
-        type: mongoose.Schema.ObjectId,
-        ref: 'User',
+        type: mongoose.Schema.Types.ObjectId,
         required: true,
+        ref: 'User',
     },
     orderItems: [
         {
             product: {
-                type: mongoose.Schema.ObjectId,
+                type: mongoose.Schema.Types.ObjectId,
+                required: true,
                 ref: 'Product',
+            },
+            quantity: {
+                type: Number,
                 required: true,
             },
-            quantity: { type: Number, required: true },
-            price: { type: Number, required: true },
-            seller: {
-                type: mongoose.Schema.ObjectId,
-                ref: 'User',
+            price: {
+                type: Number,
                 required: true,
+            },
+            seller: {
+                type: mongoose.Schema.Types.ObjectId,
+                required: true,
+                ref: 'User',
             },
         },
     ],
-    // **নতুন ফিল্ড যোগ করা হয়েছে**
+    shippingInfo: {
+        address: { type: String, required: true },
+        city: { type: String, required: true },
+        phoneNo: { type: String, required: true },
+    },
     paymentMethod: {
         type: String,
         required: true,
-        enum: ['SSLCOMMERZ', 'Cash on Delivery'],
-        default: 'SSLCOMMERZ',
+        enum: ['Cash on Delivery', 'Card', 'Mobile Banking'],
+        default: 'Cash on Delivery',
     },
     paymentInfo: {
-        id: { type: String },
-        status: { type: String, required: true, default: 'Pending' },
+        status: {
+            type: String,
+            required: true,
+            default: 'Unpaid',
+        },
     },
     totalPrice: {
         type: Number,
@@ -48,17 +54,17 @@ const orderSchema = new mongoose.Schema({
     orderStatus: {
         type: String,
         required: true,
-        default: 'Pending',
+        default: 'Processing',
     },
     transactionId: {
         type: String,
         required: true,
         unique: true,
     },
-    createdAt: {
+    deliveredAt: {
         type: Date,
-        default: Date.now,
     },
-});
+}, { timestamps: true });
 
-module.exports = mongoose.model('Order', orderSchema);
+const Order = mongoose.model('Order', orderSchema);
+module.exports = Order;

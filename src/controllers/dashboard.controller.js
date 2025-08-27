@@ -1,45 +1,101 @@
-const User = require('../models/user.model');
 const Order = require('../models/order.model');
 const Product = require('../models/product.model');
+const User = require('../models/user.model');
 
-// @desc    Get statistics for the admin dashboard
-// @route   GET /api/v1/dashboard
-// @access  Private/Admin
 const getAdminDashboardStats = async (req, res, next) => {
     try {
-        // মোট ব্যবহারকারীর সংখ্যা গণনা
-        const totalUsers = await User.countDocuments();
-
-        // মোট পণ্যের সংখ্যা গণনা
+        const totalUsers = await User.countDocuments({ role: 'customer' });
+        const totalSellers = await User.countDocuments({ role: 'seller' });
         const totalProducts = await Product.countDocuments();
 
-        // মোট অর্ডারের সংখ্যা গণনা
-        const totalOrders = await Order.countDocuments();
-
-        // মোট বিক্রয়ের পরিমাণ গণনা
-        const totalSalesResult = await Order.aggregate([
+        const orderStats = await Order.aggregate([
             {
                 $group: {
-                    _id: null, // সব ডকুমেন্টকে একটি গ্রুপে আনা হচ্ছে
-                    totalRevenue: { $sum: '$totalPrice' } // totalPrice ফিল্ডের যোগফল
+                    _id: null,
+                    totalRevenue: { $sum: "$totalPrice" },
+                    totalOrders: { $sum: 1 }
                 }
             }
         ]);
 
-        const totalSales = totalSalesResult.length > 0 ? totalSalesResult[0].totalRevenue : 0;
-
-        // সর্বশেষ কয়েকটি অর্ডার
-        const recentOrders = await Order.find({})
+        const monthlyRevenue = await Order.aggregate([
+            {
+                $match: {
+                    createdAt: { $gte: new Date(new Date().setFullYear(new Date().getFullYear() - 1)) }
+                }
+            },
+            {
+                $group: {
+                    _id: {
+                        year: { $year: "$createdAt" },
+                        month: { $month: "$createdAt" }
+                    },
+                    revenue: { $sum: "$totalPrice" }
+                }
+            },
+            { $sort: { "_id.year": 1, "_id.month": 1 } }
+        ]);
+        
+        const latestOrders = await Order.find({})
             .sort({ createdAt: -1 })
             .limit(5)
             .populate('user', 'name');
 
         res.status(200).json({
-            totalUsers,
-            totalProducts,
-            totalOrders,
-            totalSales,
-            recentOrders
+            success: true,
+            stats: {
+                totalUsers,
+                totalSellers,
+                totalProducts,
+                totalRevenue: orderStats[0]?.totalRevenue || 0,
+                totalOrders: orderStats[0]?.totalOrders || 0,
+                monthlyRevenue,
+                latestOrders
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+const getSellerDashboardStats = async (req, res, next) => {
+    try {
+        const sellerId = new mongoose.Types.ObjectId(req.user.id);
+
+        const totalProducts = await Product.countDocuments({ seller: sellerId });
+
+        const sellerOrderStats = await Order.aggregate([
+            { $unwind: "$orderItems" },
+            { $match: { "orderItems.seller": sellerId } },
+            {
+                $group: {
+                    _id: null,
+                    totalRevenue: { $sum: { $multiply: ["$orderItems.price", "$orderItems.quantity"] } },
+                    totalOrders: { $addToSet: "$_id" }
+                }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    totalRevenue: 1,
+                    totalOrders: { $size: "$totalOrders" }
+                }
+            }
+        ]);
+
+        const latestOrders = await Order.find({ "orderItems.seller": sellerId })
+            .sort({ createdAt: -1 })
+            .limit(5)
+            .select('user shippingInfo totalPrice orderStatus createdAt');
+
+        res.status(200).json({
+            success: true,
+            stats: {
+                totalProducts,
+                totalRevenue: sellerOrderStats[0]?.totalRevenue || 0,
+                totalOrders: sellerOrderStats[0]?.totalOrders || 0,
+                latestOrders
+            }
         });
 
     } catch (error) {
@@ -47,6 +103,8 @@ const getAdminDashboardStats = async (req, res, next) => {
     }
 };
 
+
 module.exports = {
-    getAdminDashboardStats
+    getAdminDashboardStats,
+    getSellerDashboardStats,
 };
