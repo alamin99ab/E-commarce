@@ -6,16 +6,8 @@ const {
     updateUserProfile,
     updateUser,
     deleteUser,
-    applyToBeSeller,
-    getPendingSellers,
-    approveSeller
 } = require('../controllers/user.controller');
 const { protect, isAdmin } = require('../middlewares/auth.middleware');
-
-router.post('/apply-seller', protect, applyToBeSeller);
-
-router.get('/sellers/pending', protect, isAdmin, getPendingSellers);
-router.put('/sellers/approve/:id', protect, isAdmin, approveSeller);
 
 router.route('/profile')
     .put(protect, updateUserProfile);

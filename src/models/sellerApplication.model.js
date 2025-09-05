@@ -1,4 +1,3 @@
-// src/models/sellerApplication.model.js
 const mongoose = require('mongoose');
 
 const sellerApplicationSchema = new mongoose.Schema({
@@ -6,7 +5,7 @@ const sellerApplicationSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         required: true,
         ref: 'User',
-        unique: true, // একজন ব্যবহারকারী একবারই আবেদন করতে পারবে
+        unique: true,
     },
     businessName: {
         type: String,

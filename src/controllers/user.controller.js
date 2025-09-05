@@ -1,58 +1,9 @@
 const User = require('../models/user.model');
 
-const applyToBeSeller = async (req, res, next) => {
-    try {
-        const userId = req.user.id;
-        const { businessName } = req.body;
-
-        if (!businessName) {
-            return res.status(400).json({ message: "Business name is required." });
-        }
-        const user = await User.findById(userId);
-        if (!user) return res.status(404).json({ message: "User not found." });
-
-        user.role = 'seller';
-        user.businessName = businessName;
-        user.approvalStatus = 'pending';
-        await user.save();
-
-        res.status(200).json({
-            success: true,
-            message: "Application submitted successfully! Please wait for admin approval.",
-        });
-    } catch (error) {
-        next(error);
-    }
-};
-
-const getPendingSellers = async (req, res, next) => {
-    try {
-        const pendingSellers = await User.find({ approvalStatus: 'pending', role: 'seller' }).select('-password');
-        res.status(200).json(pendingSellers);
-    } catch (error) {
-        next(error);
-    }
-};
-
-const approveSeller = async (req, res, next) => {
-    try {
-        const user = await User.findById(req.params.id);
-        if (user && user.role === 'seller') {
-            user.approvalStatus = 'approved';
-            await user.save();
-            res.status(200).json({ message: 'Seller approved successfully.' });
-        } else {
-            res.status(404).json({ message: 'Seller not found.' });
-        }
-    } catch (error) {
-        next(error);
-    }
-};
-
 const getAllUsers = async (req, res, next) => {
     try {
         const users = await User.find({}).select('-password');
-        res.status(200).json(users);
+        res.status(200).json({ success: true, users: users }); // সামঞ্জস্যের জন্য success:true এবং users property যোগ করা হলো
     } catch (error) {
         next(error);
     }
@@ -101,7 +52,7 @@ const updateUser = async (req, res, next) => {
             user.isActive = req.body.isActive !== undefined ? req.body.isActive : user.isActive;
             user.approvalStatus = req.body.approvalStatus || user.approvalStatus;
             const updatedUser = await user.save();
-            res.status(200).json(updatedUser);
+            res.status(200).json({ success: true, user: updatedUser });
         } else {
             res.status(404).json({ message: 'User not found.' });
         }
@@ -115,7 +66,7 @@ const deleteUser = async (req, res, next) => {
         const user = await User.findById(req.params.id);
         if (user) {
             await User.deleteOne({ _id: user._id });
-            res.status(200).json({ message: 'User removed successfully.' });
+            res.status(200).json({ success: true, message: 'User removed successfully.' });
         } else {
             res.status(404).json({ message: 'User not found.' });
         }
@@ -130,7 +81,4 @@ module.exports = {
     updateUserProfile,
     updateUser,
     deleteUser,
-    applyToBeSeller,
-    getPendingSellers,
-    approveSeller,
 };

@@ -22,7 +22,7 @@ const dashboardRoutes = require('./src/routes/dashboard.routes');
 const wishlistRoutes = require('./src/routes/wishlist.routes');
 const withdrawalRoutes = require('./src/routes/withdrawal.routes');
 const pageRoutes = require('./src/routes/page.routes');
-const applicationRoutes = require('./src/routes/application.routes'); // নতুন রাউট ইমপোর্ট করা হয়েছে
+const applicationRoutes = require('./src/routes/application.routes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -58,7 +58,7 @@ app.use('/api/v1/dashboard', dashboardRoutes);
 app.use('/api/v1/wishlist', wishlistRoutes);
 app.use('/api/v1/withdrawal', withdrawalRoutes);
 app.use('/api/v1/pages', pageRoutes);
-app.use('/api/v1/applications', applicationRoutes); // নতুন রাউট যোগ করা হয়েছে
+app.use('/api/v1/applications', applicationRoutes);
 
 // Root route
 app.get('/', (req, res) => {

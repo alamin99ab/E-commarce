@@ -1,4 +1,3 @@
-
 const SellerApplication = require('../models/sellerApplication.model');
 const User = require('../models/user.model');
 
@@ -12,13 +11,7 @@ exports.applyForSeller = async (req, res, next) => {
             return res.status(400).json({ success: false, message: 'আপনি ইতিমধ্যেই আবেদন করেছেন।' });
         }
 
-        const application = new SellerApplication({
-            user: userId,
-            businessName,
-            address,
-            phoneNo,
-        });
-
+        const application = new SellerApplication({ user: userId, businessName, address, phoneNo });
         await application.save();
         res.status(201).json({ success: true, message: 'আপনার আবেদন সফলভাবে জমা হয়েছে। অনুমোদনের জন্য অপেক্ষা করুন।' });
     } catch (error) {
@@ -37,9 +30,8 @@ exports.getAllApplications = async (req, res, next) => {
 
 exports.updateApplicationStatus = async (req, res, next) => {
     try {
-        const { status } = req.body; 
+        const { status } = req.body;
         const application = await SellerApplication.findById(req.params.id);
-
         if (!application) {
             return res.status(404).json({ success: false, message: 'আবেদন খুঁজে পাওয়া যায়নি।' });
         }
@@ -50,7 +42,6 @@ exports.updateApplicationStatus = async (req, res, next) => {
         if (status === 'approved') {
             await User.findByIdAndUpdate(application.user, { role: 'seller' });
         }
-
         res.status(200).json({ success: true, message: `আবেদনটি সফলভাবে ${status} করা হয়েছে।` });
     } catch (error) {
         next(error);
