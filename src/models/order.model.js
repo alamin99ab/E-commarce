@@ -36,7 +36,8 @@ const orderSchema = new mongoose.Schema({
     paymentMethod: {
         type: String,
         required: true,
-        enum: ['Cash on Delivery', 'Card', 'Mobile Banking'],
+        // এখানে 'SSLCOMMERZ' যোগ করা হয়েছে
+        enum: ['Cash on Delivery', 'Card', 'Mobile Banking', 'SSLCOMMERZ'],
         default: 'Cash on Delivery',
     },
     paymentInfo: {
@@ -45,6 +46,7 @@ const orderSchema = new mongoose.Schema({
             required: true,
             default: 'Unpaid',
         },
+        id: { type: String }
     },
     totalPrice: {
         type: Number,
@@ -54,13 +56,16 @@ const orderSchema = new mongoose.Schema({
     orderStatus: {
         type: String,
         required: true,
-        default: 'Processing',
+        // enum-এ নতুন স্ট্যাটাসগুলো যোগ করা হয়েছে
+        enum: ['Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled', 'Failed'],
+        default: 'Pending',
     },
     transactionId: {
         type: String,
         required: true,
         unique: true,
     },
+    isDelivered: { type: Boolean, default: false },
     deliveredAt: {
         type: Date,
     },

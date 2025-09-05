@@ -4,15 +4,18 @@ const {
     initPayment, 
     paymentSuccess, 
     paymentFail, 
-    paymentCancel 
+    paymentCancel,
+    paymentIpn
 } = require('../controllers/payment.controller');
-
-// এখানে আপনার auth.middleware.js ফাইল অনুযায়ী 'protect' ব্যবহার করা হয়েছে
 const { protect } = require('../middlewares/auth.middleware'); 
 
-router.post('/init', protect, initPayment); // 'protect' ব্যবহার করা হয়েছে
+// POST /api/v1/payment/init
+router.post('/init', protect, initPayment);
+
+// SSLCOMMERZ থেকে কলব্যাক রাউটগুলো (এগুলো POST হবে)
 router.post('/success', paymentSuccess);
 router.post('/fail', paymentFail);
 router.post('/cancel', paymentCancel);
+router.post('/ipn', paymentIpn);
 
 module.exports = router;

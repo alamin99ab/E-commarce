@@ -3,10 +3,10 @@ const Product = require('../models/product.model');
 const User = require('../models/user.model');
 const { v4: uuidv4 } = require('uuid');
 
-// createCodOrder ফাংশন অপরিবর্তিত
 const createCodOrder = async (req, res, next) => {
     try {
-        const { orderItems, shippingAddress, totalPrice, coinsToUse = 0 } = req.body;
+        // এখানে shippingAddress এর পরিবর্তে shippingInfo ব্যবহার করা হয়েছে
+        const { orderItems, shippingInfo, totalPrice, coinsToUse = 0 } = req.body;
         const user = await User.findById(req.user.id);
 
         if (coinsToUse > 0) {
@@ -17,13 +17,13 @@ const createCodOrder = async (req, res, next) => {
                 return res.status(400).json({ success: false, message: "You cannot use more coins than the order total." });
             }
         }
-        
+
         for (const item of orderItems) {
             const product = await Product.findById(item.product);
             if (!product) {
                 return res.status(404).json({ success: false, message: `Product not found.` });
             }
-            if (product.stock < item.qty) {
+            if (product.stock < item.quantity) { // এখানে item.quantity ব্যবহার করা হয়েছে
                 return res.status(400).json({
                     success: false,
                     message: `Not enough stock for ${product.name}. Available stock: ${product.stock}`,
@@ -36,16 +36,17 @@ const createCodOrder = async (req, res, next) => {
         const order = await Order.create({
             transactionId: `COD-${uuidv4()}`,
             user: req.user.id,
-            shippingAddress,
+            shippingInfo, // এখানে shippingInfo ব্যবহার করা হয়েছে
             orderItems,
             totalPrice: finalPrice,
             paymentMethod: 'Cash on Delivery',
             orderStatus: 'Processing',
+            paymentInfo: { status: 'Unpaid' },
         });
 
         for (const item of orderItems) {
             await Product.findByIdAndUpdate(item.product, {
-                $inc: { stock: -item.qty },
+                $inc: { stock: -item.quantity }, // এখানে item.quantity ব্যবহার করা হয়েছে
             });
         }
 
@@ -81,8 +82,7 @@ const getOrderById = async (req, res, next) => {
 
 const getMyOrders = async (req, res, next) => {
     try {
-        // .sort() সরানো হয়েছে
-        const orders = await Order.find({ user: req.user._id });
+        const orders = await Order.find({ user: req.user._id }).sort({ createdAt: -1 });
         res.status(200).json({ success: true, orders });
     } catch (error) {
         next(error);
@@ -91,8 +91,7 @@ const getMyOrders = async (req, res, next) => {
 
 const getAllOrders = async (req, res, next) => {
     try {
-        // .sort() সরানো হয়েছে
-        const orders = await Order.find({}).populate('user', 'id name');
+        const orders = await Order.find({}).populate('user', 'id name').sort({ createdAt: -1 });
         res.status(200).json({ success: true, orders });
     } catch (error) {
         next(error);
@@ -104,7 +103,7 @@ const updateOrderStatus = async (req, res, next) => {
         const order = await Order.findById(req.params.id);
         if (order) {
             order.orderStatus = req.body.status || order.orderStatus;
-            if(req.body.status === 'Delivered') {
+            if (req.body.status === 'Delivered') {
                 order.isDelivered = true;
                 order.deliveredAt = Date.now();
             }
@@ -122,12 +121,10 @@ const getSellerOrders = async (req, res, next) => {
     try {
         const sellerId = req.user.id;
         const orders = await Order.find({ "orderItems.seller": sellerId })
-            .populate('user', 'name email');
+            .populate('user', 'name email')
+            .populate('orderItems.product', 'name')
+            .sort({ createdAt: -1 });
             
-        if (!orders) {
-            return res.status(200).json({ success: true, orders: [] });
-        }
-        
         res.status(200).json({ success: true, orders });
     } catch (error) {
         next(error);

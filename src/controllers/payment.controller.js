@@ -6,113 +6,129 @@ const Product = require('../models/product.model');
 
 const store_id = process.env.STORE_ID;
 const store_password = process.env.STORE_PASSWORD;
-const is_live = false;
+const is_live = process.env.IS_LIVE === 'true';
 const api_url = process.env.API_URL || 'http://localhost:5000';
-const client_url = process.env.CLIENT_URL || 'http://localhost:5173';
+const client_url = process.env.CLIENT_URL || 'http://localhost:3000';
 
-exports.initPayment = async (req, res) => {
+exports.initPayment = async (req, res, next) => {
     try {
-        const { cartItems, shippingInfo } = req.body;
+        const { cartItems, shippingInfo, totalPrice } = req.body;
         const user = await User.findById(req.user.id);
 
         if (!user) return res.status(404).json({ message: "User not found." });
-        
-        let finalOrderItems = [];
-        let calculatedTotalPrice = 0;
-
-        for (const item of cartItems) {
-            const productData = await Product.findById(item._id);
-            if (!productData) return res.status(404).json({ message: `Product with ID ${item._id} not found.` });
-
-            // **যদি পণ্যের বিক্রেতা না থাকে, তাহলে .env ফাইল থেকে অ্যাডমিন আইডি ব্যবহার করা হবে**
-            const sellerId = productData.seller || process.env.ADMIN_USER_ID;
-            if (!sellerId) {
-                return res.status(400).json({ message: `Product "${productData.name}" has no seller and no default admin is set.` });
-            }
-
-            finalOrderItems.push({
-                product: productData._id,
-                quantity: item.quantity,
-                price: productData.price,
-                seller: sellerId,
-            });
-            calculatedTotalPrice += productData.price * item.quantity;
+        if (!cartItems || cartItems.length === 0) {
+            return res.status(400).json({ message: "Cart is empty." });
         }
 
-        const transactionId = uuidv4();
+        let orderItemsForDB = [];
+        for (const item of cartItems) {
+            const product = await Product.findById(item.product).select('name price imageUrl seller stock');
+            if (!product) {
+                return res.status(404).json({
+                    success: false, message: `Invalid item in cart. Please clear your cart and try again.`,
+                });
+            }
+            if (product.stock < item.quantity) {
+                return res.status(400).json({
+                    success: false, message: `Not enough stock for ${product.name}.`,
+                });
+            }
+            orderItemsForDB.push({
+                product: item.product, name: product.name, quantity: item.quantity,
+                price: product.price, imageUrl: product.imageUrl, seller: product.seller,
+            });
+        }
+        
+        const transactionId = `trans-${uuidv4()}`;
         const data = {
-            total_amount: calculatedTotalPrice,
+            total_amount: totalPrice,
             currency: 'BDT',
             tran_id: transactionId,
             success_url: `${api_url}/api/v1/payment/success`,
             fail_url: `${api_url}/api/v1/payment/fail`,
             cancel_url: `${api_url}/api/v1/payment/cancel`,
-            ipn_url: '/ipn',
+            ipn_url: `${api_url}/api/v1/payment/ipn`,
             shipping_method: 'Courier',
             product_name: 'E-commerce Order',
             product_category: 'General',
             product_profile: 'general',
-            cus_name: shippingInfo.name,
+            cus_name: user.name,
             cus_email: user.email,
             cus_add1: shippingInfo.address,
             cus_city: shippingInfo.city,
-            cus_postcode: shippingInfo.postalCode,
-            cus_country: shippingInfo.country,
-            cus_phone: shippingInfo.phone || 'N/A',
-            ship_name: shippingInfo.name,
-            ship_add1: shippingInfo.address,
-            ship_city: shippingInfo.city,
-            ship_postcode: shippingInfo.postalCode,
-            ship_country: shippingInfo.country,
+            cus_postcode: shippingInfo.postalCode || '1200',
+            cus_country: 'Bangladesh',
+            cus_phone: shippingInfo.phoneNo,
         };
-        
-        const newOrderData = {
-            transactionId,
-            user: req.user.id,
-            shippingInfo,
-            orderItems: finalOrderItems,
-            totalPrice: calculatedTotalPrice,
-            paymentMethod: 'SSLCOMMERZ', // পেমেন্টের ধরণ নির্দিষ্ট করা
-        };
+
+        const newOrder = new Order({
+            transactionId, user: req.user.id, shippingInfo,
+            orderItems: orderItemsForDB, totalPrice,
+            paymentMethod: 'SSLCOMMERZ', orderStatus: 'Pending',
+        });
+        await newOrder.save();
 
         const sslcz = new SSLCommerzPayment(store_id, store_password, is_live);
         const apiResponse = await sslcz.init(data);
 
         if (apiResponse.status === 'SUCCESS') {
-            const newOrder = new Order(newOrderData);
-            await newOrder.save();
             res.status(200).json({ url: apiResponse.GatewayPageURL });
         } else {
+            await Order.deleteOne({ transactionId });
             res.status(400).json({ message: 'Failed to initialize payment.' });
         }
     } catch (error) {
-        console.error("Payment initialization error:", error);
-        res.status(500).json({ message: error.message || 'Server error occurred.' });
+        next(error);
     }
 };
 
-exports.paymentSuccess = async (req, res) => {
+exports.paymentSuccess = async (req, res, next) => {
+    const tran_id = req.body.tran_id;
+    res.redirect(`${client_url}/payment/success?transaction_id=${tran_id}`);
+};
+
+exports.paymentFail = async (req, res, next) => {
     try {
-        const order = await Order.findOneAndUpdate({ transactionId: req.body.tran_id }, { 'paymentInfo.status': 'Paid', 'paymentInfo.id': req.body.bank_tran_id, orderStatus: 'Processing' }, { new: true });
-        if(order) res.redirect(`${client_url}/payment/success?transaction_id=${req.body.tran_id}`);
-        else res.redirect(`${client_url}/payment/fail`);
-    } catch (error) {
+        const tran_id = req.body.tran_id;
+        await Order.findOneAndUpdate({ transactionId: tran_id }, { orderStatus: 'Failed' });
         res.redirect(`${client_url}/payment/fail`);
+    } catch (error) {
+        next(error);
     }
 };
-exports.paymentFail = async (req, res) => {
+
+exports.paymentCancel = async (req, res, next) => {
     try {
-        await Order.deleteOne({ transactionId: req.body.tran_id });
+        const tran_id = req.body.tran_id;
+        await Order.findOneAndUpdate({ transactionId: tran_id }, { orderStatus: 'Cancelled' });
         res.redirect(`${client_url}/payment/fail`);
     } catch (error) {
-        res.redirect(`${client_url}/payment/fail`);
+        next(error);
     }
 };
-exports.paymentCancel = async (req, res) => {
+
+exports.paymentIpn = async (req, res, next) => {
     try {
-        await Order.deleteOne({ transactionId: req.body.tran_id });
-        res.redirect(`${client_url}/payment/fail`);
+        const sslcz = new SSLCommerzPayment(store_id, store_password, is_live);
+        const isValid = await sslcz.validate(req.body);
+
+        if (isValid) {
+            const tran_id = req.body.tran_id;
+            const order = await Order.findOneAndUpdate({ transactionId: tran_id }, {
+                paymentInfo: { status: 'Paid', id: req.body.bank_tran_id },
+                orderStatus: 'Processing',
+            });
+            
+            if(order) {
+                for (const item of order.orderItems) {
+                    await Product.findByIdAndUpdate(item.product, {
+                        $inc: { stock: -item.quantity },
+                    });
+                }
+            }
+        }
+        res.status(200).send();
     } catch (error) {
-        res.redirect(`${client_url}/payment/fail`);
+        next(error);
     }
 };

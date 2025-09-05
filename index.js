@@ -52,7 +52,7 @@ app.use('/api/v1/products', productRoutes);
 app.use('/api/v1/orders', orderRoutes);
 app.use('/api/v1/coins', coinRoutes);
 app.use('/api/v1/cart', cartRoutes);
-app.use('/api/v1/payment', paymentRoutes);
+app.use('/api/v1/payment', paymentRoutes); // এই লাইনটি payment রাউটকে فعال করে
 app.use('/api/v1/promotions', promotionRoutes);
 app.use('/api/v1/dashboard', dashboardRoutes);
 app.use('/api/v1/wishlist', wishlistRoutes);
