@@ -28,6 +28,7 @@
     "qrcode": "^1.5.4",
     "speakeasy": "^2.0.0",
     "sslcommerz-lts": "^1.2.0",
+    "streamifier": "^0.1.1",
     "stripe": "^15.8.0",
     "uuid": "^11.1.0"
   },
