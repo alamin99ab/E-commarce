@@ -23,6 +23,7 @@ const wishlistRoutes = require('./src/routes/wishlist.routes');
 const withdrawalRoutes = require('./src/routes/withdrawal.routes');
 const pageRoutes = require('./src/routes/page.routes');
 const applicationRoutes = require('./src/routes/application.routes');
+const uploadRoutes = require('./src/routes/upload.routes'); // ছবি আপলোডের জন্য নতুন রাউট
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -59,6 +60,7 @@ app.use('/api/v1/wishlist', wishlistRoutes);
 app.use('/api/v1/withdrawal', withdrawalRoutes);
 app.use('/api/v1/pages', pageRoutes);
 app.use('/api/v1/applications', applicationRoutes);
+app.use('/api/v1/upload', uploadRoutes); // নতুন রাউট যোগ করা হয়েছে
 
 // Root route
 app.get('/', (req, res) => {
