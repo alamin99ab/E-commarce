@@ -4,7 +4,6 @@ const { getAdminDashboardStats, getSellerDashboardStats } = require('../controll
 const { protect, isAdmin, isSeller } = require('../middlewares/auth.middleware');
 
 router.get('/admin-stats', protect, isAdmin, getAdminDashboardStats);
-
 router.get('/seller-stats', protect, isSeller, getSellerDashboardStats);
 
 module.exports = router;

@@ -9,7 +9,7 @@ const coinTransactionSchema = new mongoose.Schema({
     type: {
         type: String,
         required: true,
-        enum: ['credit', 'debit'] // credit মানে কয়েন জমা হওয়া, debit মানে খরচ হওয়া
+        enum: ['credit', 'debit']
     },
     amount: {
         type: Number,
@@ -19,7 +19,7 @@ const coinTransactionSchema = new mongoose.Schema({
         type: String,
         required: true
     },
-    transactionId: { // প্রতিটি লেনদেনের জন্য একটি ইউনিক আইডি
+    transactionId: {
         type: String,
         unique: true,
         required: true,
@@ -29,5 +29,4 @@ const coinTransactionSchema = new mongoose.Schema({
 });
 
 const CoinTransaction = mongoose.model('CoinTransaction', coinTransactionSchema);
-
 module.exports = CoinTransaction;

@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Order = require('../models/order.model');
 const Product = require('../models/product.model');
 const User = require('../models/user.model');
@@ -97,12 +98,10 @@ const getSellerDashboardStats = async (req, res, next) => {
                 latestOrders
             }
         });
-
     } catch (error) {
         next(error);
     }
 };
-
 
 module.exports = {
     getAdminDashboardStats,

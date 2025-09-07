@@ -1,44 +1,58 @@
 const mongoose = require('mongoose');
 
 const promotionSchema = new mongoose.Schema({
-    code: {
+    promoCode: {
         type: String,
-        required: [true, 'Promotion code is required.'],
+        required: [true, 'Promo code is required.'],
         unique: true,
         trim: true,
-        uppercase: true // কোড সবসময় বড় হাতের অক্ষরে থাকবে
-    },
-    description: {
-        type: String,
-        required: true,
+        uppercase: true, // কোড সবসময় বড় হাতের অক্ষরে থাকবে
     },
     discountType: {
         type: String,
         required: true,
-        enum: ['percentage', 'fixed'] // ডিসকাউন্ট শতাংশে বা নির্দিষ্ট পরিমাণে হতে পারে
+        enum: ['percentage', 'fixed'], // ডিসকাউন্ট শতাংশে নাকি নির্দিষ্ট টাকায়
+        default: 'percentage',
     },
     discountValue: {
         type: Number,
-        required: true
+        required: [true, 'Discount value is required.'],
+        min: [0, 'Discount value cannot be negative.'],
     },
-    minPurchase: { // সর্বনিম্ন কত টাকার কেনাকাটা করলে এই কোড ব্যবহার করা যাবে
-        type: Number,
-        default: 0
+    description: {
+        type: String,
+        required: [true, 'Description is required.'],
     },
     startDate: {
         type: Date,
-        required: true
+        required: [true, 'Start date is required.'],
     },
     endDate: {
         type: Date,
-        required: true
+        required: [true, 'End date is required.'],
+    },
+    usageLimit: {
+        type: Number,
+        default: null, // null মানে অসীম ব্যবহার
+    },
+    timesUsed: {
+        type: Number,
+        default: 0,
     },
     isActive: {
         type: Boolean,
-        default: true
+        default: true,
     }
 }, {
-    timestamps: true
+    timestamps: true,
+    // নিশ্চিত করবে যেন end date সবসময় start date এর পরে হয়
+    validateBeforeSave: true,
+    schema: {
+        assert: function() {
+            return this.endDate > this.startDate;
+        },
+        message: 'End date must be after start date.'
+    }
 });
 
 const Promotion = mongoose.model('Promotion', promotionSchema);

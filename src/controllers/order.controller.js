@@ -5,7 +5,6 @@ const { v4: uuidv4 } = require('uuid');
 
 const createCodOrder = async (req, res, next) => {
     try {
-        // এখানে shippingAddress এর পরিবর্তে shippingInfo ব্যবহার করা হয়েছে
         const { orderItems, shippingInfo, totalPrice, coinsToUse = 0 } = req.body;
         const user = await User.findById(req.user.id);
 
@@ -23,7 +22,7 @@ const createCodOrder = async (req, res, next) => {
             if (!product) {
                 return res.status(404).json({ success: false, message: `Product not found.` });
             }
-            if (product.stock < item.quantity) { // এখানে item.quantity ব্যবহার করা হয়েছে
+            if (product.stock < item.quantity) {
                 return res.status(400).json({
                     success: false,
                     message: `Not enough stock for ${product.name}. Available stock: ${product.stock}`,
@@ -36,7 +35,7 @@ const createCodOrder = async (req, res, next) => {
         const order = await Order.create({
             transactionId: `COD-${uuidv4()}`,
             user: req.user.id,
-            shippingInfo, // এখানে shippingInfo ব্যবহার করা হয়েছে
+            shippingInfo,
             orderItems,
             totalPrice: finalPrice,
             paymentMethod: 'Cash on Delivery',
@@ -46,7 +45,7 @@ const createCodOrder = async (req, res, next) => {
 
         for (const item of orderItems) {
             await Product.findByIdAndUpdate(item.product, {
-                $inc: { stock: -item.quantity }, // এখানে item.quantity ব্যবহার করা হয়েছে
+                $inc: { stock: -item.quantity },
             });
         }
 

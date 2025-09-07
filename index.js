@@ -5,10 +5,10 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const mongoose = require('mongoose');
 const passport = require('passport');
+const rateLimit = require('express-rate-limit');
 
 dotenv.config();
 
-// Route imports
 const authRoutes = require('./src/routes/auth.routes');
 const userRoutes = require('./src/routes/user.routes');
 const categoryRoutes = require('./src/routes/category.routes');
@@ -23,17 +23,15 @@ const wishlistRoutes = require('./src/routes/wishlist.routes');
 const withdrawalRoutes = require('./src/routes/withdrawal.routes');
 const pageRoutes = require('./src/routes/page.routes');
 const applicationRoutes = require('./src/routes/application.routes');
-const uploadRoutes = require('./src/routes/upload.routes'); // ছবি আপলোডের জন্য নতুন রাউট
+const uploadRoutes = require('./src/routes/upload.routes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Database connection
 mongoose.connect(process.env.MONGO_URI)
     .then(() => console.log('✅ MongoDB database connected successfully.'))
     .catch(err => console.error('❌ MongoDB connection error:', err));
 
-// Middlewares
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
@@ -45,7 +43,15 @@ if (process.env.NODE_ENV === 'development') {
     app.use(morgan('dev'));
 }
 
-// API Routes
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 100,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: 'Too many requests from this IP, please try again after 15 minutes',
+});
+app.use(limiter);
+
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/categories', categoryRoutes);
@@ -60,14 +66,12 @@ app.use('/api/v1/wishlist', wishlistRoutes);
 app.use('/api/v1/withdrawal', withdrawalRoutes);
 app.use('/api/v1/pages', pageRoutes);
 app.use('/api/v1/applications', applicationRoutes);
-app.use('/api/v1/upload', uploadRoutes); // নতুন রাউট যোগ করা হয়েছে
+app.use('/api/v1/upload', uploadRoutes);
 
-// Root route
 app.get('/', (req, res) => {
     res.send('🏠 API server is running successfully!');
 });
 
-// Global error handler
 app.use((err, req, res, next) => {
     console.error(err.stack);
     const statusCode = err.statusCode || 500;
@@ -78,7 +82,11 @@ app.use((err, req, res, next) => {
     });
 });
 
-// Start server
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
     console.log(`🚀 Server is running on http://localhost:${PORT}`);
+});
+
+process.on('unhandledRejection', (err, promise) => {
+    console.error(`❌ Error: ${err.message}`);
+    server.close(() => process.exit(1));
 });
