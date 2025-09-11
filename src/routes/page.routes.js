@@ -1,13 +1,21 @@
-// File: routes/page.routes.js
 const express = require('express');
 const router = express.Router();
-const { getPageBySlug, createOrUpdatePage } = require('../controllers/page.controller');
+const {
+    createPage,
+    getAllActivePages,
+    getPageBySlug,
+    updatePage,
+    deletePage
+} = require('../controllers/page.controller');
 const { protect, isAdmin } = require('../middlewares/auth.middleware');
 
-// --- সাধারণ ব্যবহারকারীদের জন্য রুট ---
+// Public routes
+router.get('/', getAllActivePages);
 router.get('/:slug', getPageBySlug);
 
-// --- অ্যাডমিনের জন্য রুট ---
-router.post('/update', protect, isAdmin, createOrUpdatePage);
+// Admin routes
+router.post('/', protect, isAdmin, createPage);
+router.put('/:id', protect, isAdmin, updatePage);
+router.delete('/:id', protect, isAdmin, deletePage);
 
 module.exports = router;

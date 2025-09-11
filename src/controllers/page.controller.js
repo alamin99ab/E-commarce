@@ -1,37 +1,74 @@
-// File: controllers/page.controller.js
 const Page = require('../models/page.model');
 
-// --- একটি পেইজের তথ্য তার slug দিয়ে পাওয়া ---
-const getPageBySlug = async (req, res, next) => {
+// @desc    Create a new page
+// @route   POST /api/v1/pages
+// @access  Private/Admin
+exports.createPage = async (req, res, next) => {
     try {
-        const page = await Page.findOne({ slug: req.params.slug });
+        const { title, slug, content, metaTitle, metaDescription } = req.body;
+        const page = await Page.create({ title, slug, content, metaTitle, metaDescription });
+        res.status(201).json({ success: true, data: page });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// @desc    Get all active pages (for public view)
+// @route   GET /api/v1/pages
+// @access  Public
+exports.getAllActivePages = async (req, res, next) => {
+    try {
+        const pages = await Page.find({ isActive: true }).select('title slug');
+        res.status(200).json({ success: true, data: pages });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// @desc    Get a single page by its slug (for public view)
+// @route   GET /api/v1/pages/:slug
+// @access  Public
+exports.getPageBySlug = async (req, res, next) => {
+    try {
+        const page = await Page.findOne({ slug: req.params.slug, isActive: true });
         if (!page) {
-            return res.status(404).json({ success: false, message: 'Page not found' });
+            return res.status(404).json({ success: false, message: 'Page not found.' });
         }
-        res.status(200).json({ success: true, page });
+        res.status(200).json({ success: true, data: page });
     } catch (error) {
         next(error);
     }
 };
 
-// --- একটি পেইজ তৈরি বা আপডেট করা (অ্যাডমিন) ---
-const createOrUpdatePage = async (req, res, next) => {
+// @desc    Update a page by ID
+// @route   PUT /api/v1/pages/:id
+// @access  Private/Admin
+exports.updatePage = async (req, res, next) => {
     try {
-        const { slug, title, content } = req.body;
-        
-        const page = await Page.findOneAndUpdate(
-            { slug },
-            { title, content },
-            { new: true, upsert: true, runValidators: true } // upsert: true মানে হলো, যদি পেইজ না থাকে তাহলে নতুন তৈরি করবে
-        );
-        
-        res.status(200).json({ success: true, message: 'Page content updated successfully', page });
+        const page = await Page.findByIdAndUpdate(req.params.id, req.body, {
+            new: true,
+            runValidators: true,
+        });
+        if (!page) {
+            return res.status(404).json({ success: false, message: 'Page not found.' });
+        }
+        res.status(200).json({ success: true, data: page });
     } catch (error) {
         next(error);
     }
 };
 
-module.exports = {
-    getPageBySlug,
-    createOrUpdatePage,
+// @desc    Delete a page by ID
+// @route   DELETE /api/v1/pages/:id
+// @access  Private/Admin
+exports.deletePage = async (req, res, next) => {
+    try {
+        const page = await Page.findByIdAndDelete(req.params.id);
+        if (!page) {
+            return res.status(404).json({ success: false, message: 'Page not found.' });
+        }
+        res.status(200).json({ success: true, message: 'Page deleted successfully.' });
+    } catch (error) {
+        next(error);
+    }
 };

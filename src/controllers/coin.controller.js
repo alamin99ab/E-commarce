@@ -1,61 +1,74 @@
-const User = require('../models/user.model');
-const CoinTransaction = require('../models/coinTransaction.model');
-const crypto = require('crypto');
+// src/controllers/coin.controller.js
 
-const getCoinBalance = async (req, res, next) => {
+const Coin = require('../models/coin.model');
+
+// ইউজারের কয়েন ব্যালেন্স দেখার জন্য
+exports.getCoinBalance = async (req, res, next) => {
     try {
-        res.status(200).json({
-            coinBalance: req.user.coinBalance
-        });
-    } catch (error) {
-        next(error);
-    }
-};
+        let userCoin = await Coin.findOne({ user: req.user._id });
 
-const getCoinHistory = async (req, res, next) => {
-    try {
-        const transactions = await CoinTransaction.find({ user: req.user._id }).sort({ createdAt: -1 });
-        res.status(200).json(transactions);
-    } catch (error) {
-        next(error);
-    }
-};
-
-const addCoins = async (req, res, next) => {
-    const { userId, amount, description } = req.body;
-    if (!userId || !amount || !description) {
-        return res.status(400).json({ message: 'User ID, amount, and description are required.' });
-    }
-
-    try {
-        const user = await User.findById(userId);
-        if (!user) {
-            return res.status(404).json({ message: 'User not found.' });
+        if (!userCoin) {
+            userCoin = await Coin.create({ user: req.user._id, balance: 0, transactions: [] });
         }
 
-        user.coinBalance += Number(amount);
-
-        await CoinTransaction.create({
-            user: userId,
-            type: 'credit',
-            amount: Number(amount),
-            description: description,
-            transactionId: crypto.randomBytes(16).toString('hex')
-        });
-
-        await user.save();
-
         res.status(200).json({
-            message: `${amount} coins added successfully to ${user.name}.`,
-            newBalance: user.coinBalance
+            success: true,
+            balance: userCoin.balance,
+            transactions: userCoin.transactions,
         });
     } catch (error) {
         next(error);
     }
 };
 
-module.exports = {
-    getCoinBalance,
-    getCoinHistory,
-    addCoins
+// সিস্টেমে কয়েন যোগ করার জন্য (অ্যাডমিন)
+exports.addCoins = async (req, res, next) => {
+    try {
+        const { userId, amount, description } = req.body;
+
+        let userCoin = await Coin.findOne({ user: userId });
+        if (!userCoin) {
+            userCoin = await Coin.create({ user: userId, balance: 0, transactions: [] });
+        }
+
+        userCoin.balance += Number(amount);
+        userCoin.transactions.push({
+            type: 'earned',
+            amount: Number(amount),
+            description,
+        });
+
+        await userCoin.save();
+
+        res.status(200).json({ success: true, message: 'Coins added successfully.' });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// কয়েন খরচ করার জন্য
+exports.spendCoins = async (req, res, next) => {
+    try {
+        const { amount, description } = req.body;
+        const userId = req.user._id;
+
+        let userCoin = await Coin.findOne({ user: userId });
+
+        if (!userCoin || userCoin.balance < Number(amount)) {
+            return res.status(400).json({ success: false, message: 'Insufficient coin balance.' });
+        }
+
+        userCoin.balance -= Number(amount);
+        userCoin.transactions.push({
+            type: 'spent',
+            amount: Number(amount),
+            description,
+        });
+
+        await userCoin.save();
+
+        res.status(200).json({ success: true, message: 'Coins spent successfully.' });
+    } catch (error) {
+        next(error);
+    }
 };

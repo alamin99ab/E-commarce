@@ -1,8 +1,85 @@
-const Order = require('../models/order.model');
-const Product = require('../models/product.model');
-const User = require('../models/user.model');
+const Order = require('../models/order.model'); // <-- ঠিক করা হয়েছে
+const Product = require('../models/product.model'); // <-- ঠিক করা হয়েছে
+const User = require('../models/user.model'); // <-- ঠিক করা হয়েছে
+const SSLCommerzPayment = require('sslcommerz-lts');
 const { v4: uuidv4 } = require('uuid');
 
+// ============================================================
+//               Initialize Online Payment (SSL Commerz)
+// ============================================================
+const initPayment = async (req, res, next) => {
+    try {
+        const { orderItems, shippingInfo } = req.body;
+        const user = await User.findById(req.user.id);
+
+        if (!orderItems || !shippingInfo || !user) {
+            return res.status(400).json({ message: "অর্ডারের জন্য প্রয়োজনীয় তথ্য পাওয়া যায়নি।" });
+        }
+
+        const totalPrice = orderItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
+
+        if (totalPrice <= 0) {
+            return res.status(400).json({ message: "কার্ট খালি রাখা যাবে না।" });
+        }
+
+        const transactionId = `gramroot_${uuidv4().slice(0, 15)}`;
+
+        const data = {
+            total_amount: totalPrice,
+            currency: 'BDT',
+            tran_id: transactionId,
+            success_url: `${process.env.FRONTEND_URL}/payment/success?transactionId=${transactionId}`,
+            fail_url: `${process.env.FRONTEND_URL}/payment/fail`,
+            cancel_url: `${process.env.FRONTEND_URL}/cart`,
+            ipn_url: '/ipn',
+            shipping_method: 'Courier',
+            product_name: 'GramRoot Various Products',
+            product_category: 'E-commerce',
+            product_profile: 'general',
+            cus_name: user.name,
+            cus_email: user.email,
+            cus_add1: shippingInfo.address,
+            cus_city: shippingInfo.city,
+            cus_state: shippingInfo.city,
+            cus_postcode: shippingInfo.postalCode,
+            cus_country: 'Bangladesh',
+            cus_phone: shippingInfo.phoneNo,
+            ship_name: user.name,
+            ship_add1: shippingInfo.address,
+            ship_city: shippingInfo.city,
+            ship_state: shippingInfo.city,
+            ship_postcode: shippingInfo.postalCode,
+            ship_country: 'Bangladesh',
+        };
+
+        const order = new Order({
+            transactionId,
+            user: req.user.id,
+            shippingInfo,
+            orderItems,
+            totalPrice,
+            paymentMethod: 'Online',
+            paymentInfo: { status: 'Pending' },
+        });
+
+        await order.save();
+
+        const sslcz = new SSLCommerzPayment(process.env.STORE_ID, process.env.STORE_PASSWORD, false);
+        const apiResponse = await sslcz.init(data);
+
+        if (apiResponse.status === 'SUCCESS' && apiResponse.GatewayPageURL) {
+            res.status(200).json({ success: true, url: apiResponse.GatewayPageURL });
+        } else {
+            res.status(400).json({ success: false, message: "পেমেন্ট শুরু করা যায়নি।", error: apiResponse });
+        }
+    } catch (error) {
+        next(error);
+    }
+};
+
+// ============================================================
+//               Create Cash on Delivery Order
+// ============================================================
 const createCodOrder = async (req, res, next) => {
     try {
         const { orderItems, shippingInfo, totalPrice, coinsToUse = 0 } = req.body;
@@ -70,7 +147,7 @@ const getOrderById = async (req, res, next) => {
         if (!order) {
             return res.status(404).json({ success: false, message: 'Order not found.' });
         }
-        if (order.user._id.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+        if (order.user._id.toString() !== req.user.id.toString() && req.user.role !== 'admin') {
             return res.status(403).json({ success: false, message: 'Not authorized to view this order.' });
         }
         res.status(200).json({ success: true, order });
@@ -81,7 +158,7 @@ const getOrderById = async (req, res, next) => {
 
 const getMyOrders = async (req, res, next) => {
     try {
-        const orders = await Order.find({ user: req.user._id }).sort({ createdAt: -1 });
+        const orders = await Order.find({ user: req.user.id }).sort({ createdAt: -1 });
         res.status(200).json({ success: true, orders });
     } catch (error) {
         next(error);
@@ -131,6 +208,7 @@ const getSellerOrders = async (req, res, next) => {
 };
 
 module.exports = {
+    initPayment,
     getOrderById,
     getMyOrders,
     getAllOrders,

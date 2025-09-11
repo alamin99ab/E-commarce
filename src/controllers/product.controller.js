@@ -1,9 +1,13 @@
-const Product = require('../models/product.model');
-const User = require('../models/user.model');
+const Product = require('../models/product.model'); // <-- ভুলটি এখানে ছিল, ঠিক করা হয়েছে
+const User = require('../models/user.model'); // <-- এটিও যোগ করা হয়েছে
 
 const getMyProducts = async (req, res, next) => {
     try {
-        const products = await Product.find({ seller: req.user._id })
+        // সেলার লগইন করা আছে কিনা তা চেক করা হচ্ছে
+        if (!req.user || !req.user.id) {
+            return res.status(401).json({ success: false, message: "এই পাতাটি দেখার জন্য আপনাকে লগইন করতে হবে।" });
+        }
+        const products = await Product.find({ seller: req.user.id })
             .populate('category', 'name');
         res.status(200).json({ success: true, products });
     } catch (error) {
@@ -15,7 +19,7 @@ const createProduct = async (req, res, next) => {
     try {
         const product = new Product({
             ...req.body,
-            seller: req.user._id
+            seller: req.user.id
         });
         const createdProduct = await product.save();
         res.status(201).json({ success: true, product: createdProduct });
@@ -87,7 +91,7 @@ const updateProduct = async (req, res, next) => {
         if (!product) {
             return res.status(404).json({ message: 'Product not found.' });
         }
-        if (product.seller.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+        if (product.seller.toString() !== req.user.id.toString() && req.user.role !== 'admin') {
             return res.status(403).json({ message: 'Forbidden: You are not authorized to update this product.' });
         }
         Object.assign(product, req.body);
@@ -104,7 +108,7 @@ const deleteProduct = async (req, res, next) => {
         if (!product) {
             return res.status(404).json({ message: 'Product not found.' });
         }
-        if (product.seller.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+        if (product.seller.toString() !== req.user.id.toString() && req.user.role !== 'admin') {
             return res.status(403).json({ message: 'Forbidden: You are not authorized to delete this product.' });
         }
         await Product.deleteOne({ _id: req.params.id });
@@ -121,7 +125,7 @@ const createProductReview = async (req, res, next) => {
         if (!product) {
             return res.status(404).json({ message: 'Product not found.' });
         }
-        const alreadyReviewed = product.reviews.find(r => r.user.toString() === req.user._id.toString());
+        const alreadyReviewed = product.reviews.find(r => r.user.toString() === req.user.id.toString());
         if (alreadyReviewed) {
             return res.status(400).json({ message: 'You have already reviewed this product.' });
         }
@@ -129,7 +133,7 @@ const createProductReview = async (req, res, next) => {
             name: req.user.name,
             rating: Number(rating),
             comment,
-            user: req.user._id
+            user: req.user.id
         };
         product.reviews.push(review);
         product.numReviews = product.reviews.length;
